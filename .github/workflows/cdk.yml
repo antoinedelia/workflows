@@ -75,4 +75,11 @@ jobs:
       # 7. Deploy the CDK stack
       - name: Deploy CDK Stack
         working-directory: ${{ inputs.working-directory }}
-        run: cdk deploy --all --require-approval never
+        run: cdk deploy --all --require-approval never --outputs-file cdk-outputs.json
+
+      # 8. Upload outputs to be used in caller workflow
+      - name: Upload CDK Outputs as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdk-outputs-artifact
+          path: ${{ inputs.working-directory }}/cdk-outputs.json
