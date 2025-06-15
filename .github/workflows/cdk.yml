@@ -1,0 +1,78 @@
+name: Reusable AWS CDK Deployment
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: 'The version of Python to set up'
+        required: false
+        type: string
+        default: '3.13'
+      node-version:
+        description: 'The version of Node.js to set up'
+        required: false
+        type: string
+        default: '22'
+      working-directory:
+        description: 'The directory where the CDK app is located'
+        required: false
+        type: string
+        default: '.'
+      aws-region:
+        description: 'The AWS region where to deploy the infrastructure'
+        required: false
+        type: string
+        default: 'eu-west-1'
+
+    secrets:
+      AWS_ROLE_ARN:
+        description: 'The AWS IAM Role to assume for deployment'
+        required: true
+
+jobs:
+  deploy-cdk-stack:
+    runs-on: ubuntu-latest
+
+    # These permissions are required for aws-actions/configure-aws-credentials to use OIDC
+    permissions:
+      id-token: write # Required for federated credentials
+      contents: read  # Required for checkout
+
+    steps:
+      # 1. Check out the repository code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Set up Python using the version from the input
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      # 3. Set up Node.js using the version from the input
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      # 4. Install AWS CDK globally
+      - name: Install AWS CDK
+        run: npm install -g aws-cdk
+
+      # 5. Install Python dependencies from requirements.txt
+      - name: Set up Python dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: pip install -r requirements.txt
+
+      # 6. Configure AWS credentials using OIDC Role
+      #    The role ARN is passed as a secret from the calling workflow
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ inputs.aws-region }}
+
+      # 7. Deploy the CDK stack
+      - name: Deploy CDK Stack
+        working-directory: ${{ inputs.working-directory }}
+        run: cdk deploy --all --require-approval never
