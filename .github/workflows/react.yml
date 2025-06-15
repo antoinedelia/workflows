@@ -1,0 +1,81 @@
+name: Reusable React Build and Deploy
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: 'The version of Node.js to use for the build'
+        required: false
+        type: string
+        default: '22'
+      working-directory:
+        description: 'The directory where the React app source code is located'
+        required: true
+        type: string
+        default: 'web'
+      s3-bucket-name:
+        description: 'The name of the S3 bucket to deploy the static files to'
+        required: true
+        type: string
+      cloudfront-distribution-id:
+        description: 'The ID of the CloudFront distribution to invalidate'
+        required: true
+        type: string
+      aws-region:
+        description: 'The AWS region of the S3 bucket and CloudFront distribution'
+        required: true
+        type: string
+        default: 'eu-west-1'
+
+    secrets:
+      AWS_ROLE_ARN:
+        description: 'The AWS IAM Role to assume for deploying to S3 and CloudFront'
+        required: true
+
+jobs:
+  build-and-deploy-react:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Required for OIDC
+      contents: read  # Required to checkout the code
+
+    steps:
+      # 1. Check out the repository code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Set up Node.js using the specified version
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'npm' # Enable caching for npm dependencies
+          cache-dependency-path: '${{ inputs.working-directory }}/package-lock.json'
+
+      # 3. Install dependencies using 'npm ci' for faster, reliable installs
+      - name: Install Dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: npm ci
+
+      # 4. Build the React application
+      - name: Build React App
+        working-directory: ${{ inputs.working-directory }}
+        run: npm run build
+
+      # 5. Configure AWS credentials using the provided role
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ inputs.aws-region }}
+
+      # 6. Deploy static files to S3
+      - name: Deploy to S3 Bucket
+        run: |
+          aws s3 sync ${{ inputs.working-directory }}/build s3://${{ inputs.s3-bucket-name }} --delete
+        # The '--delete' flag removes old files from the S3 bucket
+
+      # 7. Invalidate CloudFront cache
+      - name: Invalidate CloudFront Distribution
+        run: |
+          aws cloudfront create-invalidation --distribution-id ${{ inputs.cloudfront-distribution-id }} --paths "/*"
