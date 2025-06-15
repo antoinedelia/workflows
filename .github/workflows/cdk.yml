@@ -83,3 +83,4 @@ jobs:
         with:
           name: cdk-outputs-artifact
           path: ${{ inputs.working-directory }}/cdk-outputs.json
+          retention-days: 1
