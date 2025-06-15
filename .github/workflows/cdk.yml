@@ -18,6 +18,11 @@ on:
         required: false
         type: string
         default: '.'
+      cdk-outputs-artifact-name:
+        description: 'The name of the artifact of the CDK outputs'
+        required: false
+        type: string
+        default: 'cdk-outputs'
       aws-region:
         description: 'The AWS region where to deploy the infrastructure'
         required: false
@@ -81,6 +86,6 @@ jobs:
       - name: Upload CDK Outputs as Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cdk-outputs-artifact
+          name: ${{ inputs.cdk-outputs-artifact-name }}
           path: ${{ inputs.working-directory }}/cdk-outputs.json
           retention-days: 1
